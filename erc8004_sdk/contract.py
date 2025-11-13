@@ -144,7 +144,7 @@ class BaseContractService:
 
         if self._account:
             signed = self._account.sign_transaction(tx)
-            tx_hash = self.web3.eth.send_raw_transaction(signed.rawTransaction)
+            tx_hash = self.web3.eth.send_raw_transaction(signed.raw_transaction)
         else:
             tx_hash = self.web3.eth.send_transaction(tx)
 

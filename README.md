@@ -99,3 +99,25 @@ Run the full reputation workflow demo:
 python examples/reputation_workflow.py
 ```
 
+The example script reads configuration from a `.env` file in the project root. Create a `.env` file with the following variables:
+
+```bash
+# RPC Configuration
+RPC_URL=https://data-seed-prebsc-1-s1.bnbchain.org:8545
+
+# Contract Addresses
+IDENTITY_CONTRACT_ADDRESS=0xYourIdentityRegistryAddress
+REPUTATION_CONTRACT_ADDRESS=0xYourReputationRegistryAddress
+
+# Bob's Credentials (Agent Owner)
+BOB_PRIVATE_KEY=0xYourBobPrivateKey
+BOB_ADDRESS=0xYourBobAddress
+
+# Alice's Credentials (Feedback Provider)
+ALICE_PRIVATE_KEY=0xYourAlicePrivateKey
+ALICE_ADDRESS=0xYourAliceAddress
+
+# Chain Configuration
+CHAIN_ID=11155111
+```
+

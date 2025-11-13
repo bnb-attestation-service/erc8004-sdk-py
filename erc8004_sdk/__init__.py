@@ -6,13 +6,13 @@ ERC-8004 compatible registry contracts.
 """
 
 from .client import ERC8004Client
-from .contract import ContractService, ReputationRegistryService
+from .contract import IdentityRegistryService, ReputationRegistryService
 from .signer import AuthFeedbck, FeedbackAuthPayload
 from .exceptions import ContractInteractionError, SignatureError
 
 __all__ = [
     "ERC8004Client",
-    "ContractService",
+    "IdentityRegistryService",
     "ReputationRegistryService",
     "AuthFeedbck",
     "FeedbackAuthPayload",

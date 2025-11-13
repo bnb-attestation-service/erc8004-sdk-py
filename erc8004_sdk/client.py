@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional, Sequence, Union
+from typing import Any, Dict, Mapping, Optional, Union
 
+from .abi import IDENTITY_REGISTRY_ABI, REPUTATION_REGISTRY_ABI
 from .contract import IdentityRegistryService, ReputationRegistryService
 from .exceptions import ContractInteractionError
 from .types import (
@@ -24,27 +25,25 @@ class ERC8004Client:
         self,
         *,
         rpc_url: str,
+        identity_contract_address: str,
+        reputation_contract_address: str,
         default_account: Optional[str] = None,
         private_key: Optional[str] = None,
-        identity_contract_address: Optional[str] = None,
-        identity_contract_abi: Optional[Sequence[Dict[str, Any]]] = None,
         enable_poa: bool = False,
-        reputation_contract_address: Optional[str] = None,
-        reputation_contract_abi: Optional[Sequence[Dict[str, Any]]] = None,
     ) -> None:
-        if not identity_contract_address or not identity_contract_abi:
+        if not identity_contract_address:
             raise ContractInteractionError(
-                "identity_contract_address and identity_contract_abi must be provided."
+                "identity_contract_address must be provided."
             )
-        if not reputation_contract_address or not reputation_contract_abi:
+        if not reputation_contract_address:
             raise ContractInteractionError(
-                "reputation_contract_address and reputation_contract_abi must be provided."
+                "reputation_contract_address must be provided."
             )
 
         identity_registry_config = ContractConfig(
             rpc_url=rpc_url,
             contract_address=identity_contract_address,
-            contract_abi=identity_contract_abi,
+            contract_abi=IDENTITY_REGISTRY_ABI,
             default_account=default_account,
             private_key=private_key,
         )
@@ -53,7 +52,7 @@ class ERC8004Client:
         reputation_registry_config = ContractConfig(
             rpc_url=rpc_url,
             contract_address=reputation_contract_address,
-            contract_abi=reputation_contract_abi,
+            contract_abi=REPUTATION_REGISTRY_ABI,
             default_account=default_account,
             private_key=private_key,
         )
@@ -63,6 +62,18 @@ class ERC8004Client:
     def contract_address(self) -> str:
         """Return current contract address."""
         return self._identity_registry_service.contract.address
+
+    def register_minimal(
+        self,
+        *,
+        gas_limit: int = 0,
+        value: int = 0,
+    ) -> IdentityRegistrationResult:
+        """Register an agent with no parameters (empty agent)."""
+
+        return self._identity_registry_service.register_minimal(
+            gas_limit=gas_limit, value=value
+        )
 
     def register_agent(
         self,
@@ -84,14 +95,54 @@ class ERC8004Client:
         )
         return self._identity_registry_service.register_agent(args)
 
-    def register_function(self, **kwargs: Any) -> IdentityRegistrationResult:
-        """Backward-compatible alias that forwards to `register_agent`."""
+    def register_with_uri(
+        self,
+        token_uri: str,
+        *,
+        gas_limit: int = 0,
+        value: int = 0,
+    ) -> IdentityRegistrationResult:
+        """Register an agent with only a token URI."""
 
-        if "function_selector" in kwargs or "metadata_uri" in kwargs:
-            raise ContractInteractionError(
-                "Contract interface has changed; please use register_agent(token_uri=..., metadata=...)."
-            )
-        return self.register_agent(**kwargs)
+        return self._identity_registry_service.register_with_uri(
+            token_uri, gas_limit=gas_limit, value=value
+        )
+
+    def set_agent_uri(
+        self,
+        *,
+        agent_id: int,
+        new_uri: str,
+        gas_limit: int = 0,
+        value: int = 0,
+    ) -> str:
+        """Update the token URI for an agent."""
+
+        return self._identity_registry_service.set_agent_uri(
+            agent_id=agent_id,
+            new_uri=new_uri,
+            gas_limit=gas_limit,
+            value=value,
+        )
+
+    def set_metadata(
+        self,
+        *,
+        agent_id: int,
+        key: str,
+        value: Union[str, bytes],
+        gas_limit: int = 0,
+        value_amount: int = 0,
+    ) -> str:
+        """Update a metadata entry for an agent."""
+
+        return self._identity_registry_service.set_metadata(
+            agent_id=agent_id,
+            key=key,
+            value_bytes=value,
+            gas_limit=gas_limit,
+            value=value_amount,
+        )
 
     def approve(
         self,

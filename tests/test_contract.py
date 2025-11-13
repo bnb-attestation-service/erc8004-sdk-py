@@ -5,13 +5,16 @@ from hexbytes import HexBytes
 from web3 import Web3
 from web3.exceptions import ContractLogicError
 
-from erc8004_sdk.contract import ContractService
+from erc8004_sdk.contract import IdentityRegistryService
 from erc8004_sdk.exceptions import ContractInteractionError
-from erc8004_sdk.types import RegistrationReceipt, RegistrationResult
+from erc8004_sdk.types import (
+    IdentityRegistrationReceipt,
+    IdentityRegistrationResult,
+)
 
 
 def _make_service_with_event(logs):
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     registered_event = MagicMock()
     registered_event.process_receipt.return_value = logs
@@ -31,7 +34,7 @@ def test_decode_registration_receipt_extracts_agent_id():
 
     receipt = service._decode_registration_receipt({"status": 1})
 
-    assert isinstance(receipt, RegistrationReceipt)
+    assert isinstance(receipt, IdentityRegistrationReceipt)
     assert receipt.agent_id == 99
     assert receipt.events[0]["event"] == "Registered"
     assert receipt.events[0]["args"]["owner"] == "0xabc"
@@ -47,7 +50,7 @@ def test_decode_registration_receipt_handles_missing_events():
 
 
 def test_register_agent_returns_result_with_agent_id():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.call.return_value = 7
@@ -72,7 +75,7 @@ def test_register_agent_returns_result_with_agent_id():
 
     result = service.register_agent(args)
 
-    assert isinstance(result, RegistrationResult)
+    assert isinstance(result, IdentityRegistrationResult)
     assert result.tx_hash == Web3.to_hex(HexBytes("0xaaa"))
     assert result.agent_id == 7
     fn_mock.call.assert_called_once()
@@ -81,7 +84,7 @@ def test_register_agent_returns_result_with_agent_id():
 
 
 def test_register_agent_handles_call_failure():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.call.side_effect = ContractLogicError("reverted")
@@ -113,7 +116,7 @@ def test_register_agent_handles_call_failure():
 
 
 def test_register_minimal_uses_parameterless_overload():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.call.return_value = 8
@@ -137,7 +140,7 @@ def test_register_minimal_uses_parameterless_overload():
 
 
 def test_register_with_uri_calls_string_overload():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.call.return_value = 12
@@ -160,7 +163,7 @@ def test_register_with_uri_calls_string_overload():
 
 
 def test_set_agent_uri_builds_transaction():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.estimate_gas.return_value = 21000
@@ -182,7 +185,7 @@ def test_set_agent_uri_builds_transaction():
 
 
 def test_set_metadata_builds_transaction_bytes_conversion():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.estimate_gas.return_value = 21000
@@ -206,7 +209,7 @@ def test_set_metadata_builds_transaction_bytes_conversion():
     assert tx_hash == Web3.to_hex(HexBytes("0xbb"))
     service._contract.functions.setMetadata.assert_called_once()
 def test_get_approved_returns_address():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.call.return_value = "0x" + "1" * 40
@@ -219,7 +222,7 @@ def test_get_approved_returns_address():
 
 
 def test_get_approved_raises_on_logic_error():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.call.side_effect = ContractLogicError("reverted")
@@ -234,7 +237,7 @@ def test_get_approved_raises_on_logic_error():
 
 
 def test_is_approved_for_all_returns_bool():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.call.return_value = True
@@ -251,7 +254,7 @@ def test_is_approved_for_all_returns_bool():
 
 
 def test_approve_builds_and_sends_transaction():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.estimate_gas.return_value = 21000
@@ -275,7 +278,7 @@ def test_approve_builds_and_sends_transaction():
 
 
 def test_set_approval_for_all_builds_and_sends_transaction():
-    service = ContractService.__new__(ContractService)
+    service = IdentityRegistryService.__new__(IdentityRegistryService)
     service._contract = MagicMock()
     fn_mock = MagicMock()
     fn_mock.estimate_gas.return_value = 21000

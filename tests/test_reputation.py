@@ -8,7 +8,12 @@ from web3 import Web3
 
 from erc8004_sdk.exceptions import ContractInteractionError
 from erc8004_sdk.contract import ReputationRegistryService
-from erc8004_sdk.types import ContractConfig, FeedbackArgs, RevokeFeedbackArgs, ResponseArgs
+from erc8004_sdk.types import (
+    ContractConfig,
+    ReputationFeedbackArgs,
+    ReputationRevokeFeedbackArgs,
+    ReputationResponseArgs,
+)
 
 
 def _make_service() -> ReputationRegistryService:
@@ -42,7 +47,7 @@ def test_give_feedback_builds_transaction(monkeypatch):
     fn_mock.build_transaction.return_value = {"nonce": 1}
     service._contract.functions.giveFeedback.return_value = fn_mock
 
-    args = FeedbackArgs(
+    args = ReputationFeedbackArgs(
         agent_id=1,
         score=9,
         tag1="tag-1",
@@ -66,7 +71,7 @@ def test_append_response_builds_transaction():
     fn_mock.build_transaction.return_value = {"nonce": 1}
     service._contract.functions.appendResponse.return_value = fn_mock
 
-    args = ResponseArgs(
+    args = ReputationResponseArgs(
         agent_id=1,
         client_address="0x" + "3" * 40,
         feedback_index=5,
@@ -87,7 +92,7 @@ def test_revoke_feedback_builds_transaction():
     fn_mock.build_transaction.return_value = {"nonce": 1}
     service._contract.functions.revokeFeedback.return_value = fn_mock
 
-    args = RevokeFeedbackArgs(agent_id=1, feedback_index=2)
+    args = ReputationRevokeFeedbackArgs(agent_id=1, feedback_index=2)
 
     tx_hash = service.revoke_feedback(args)
 
