@@ -14,10 +14,17 @@ from __future__ import annotations
 import os
 import time
 from pathlib import Path
+from typing import Dict, List, Optional, Any
 
 from dotenv import load_dotenv
 
 from erc8004_sdk import AuthFeedbck, ERC8004Client
+from erc8004_sdk.storage import IPFSStorage
+from erc8004_sdk.types import (
+    AgentEndpoint,
+    AgentProfile,
+    AgentRegistrationEntry,
+)
 
 
 def main() -> None:
@@ -26,37 +33,29 @@ def main() -> None:
     load_dotenv(env_path)
 
     # Configuration from environment variables
-    rpc_url = os.getenv("RPC_URL")
-    identity_contract = os.getenv("IDENTITY_CONTRACT_ADDRESS")
-    reputation_contract = os.getenv("REPUTATION_CONTRACT_ADDRESS")
+    rpc_url = _require_env("RPC_URL")
+    identity_contract = _require_env("IDENTITY_CONTRACT_ADDRESS")
+    reputation_contract = _require_env("REPUTATION_CONTRACT_ADDRESS")
 
     # Bob's credentials
-    bob_private_key = os.getenv("BOB_PRIVATE_KEY")
-    bob_address = os.getenv("BOB_ADDRESS")
+    bob_private_key = _require_env("BOB_PRIVATE_KEY")
+    bob_address = _require_env("BOB_ADDRESS")
 
     # Alice's credentials
-    alice_private_key = os.getenv("ALICE_PRIVATE_KEY")
-    alice_address = os.getenv("ALICE_ADDRESS")
+    alice_private_key = _require_env("ALICE_PRIVATE_KEY")
+    alice_address = _require_env("ALICE_ADDRESS")
 
     # Chain configuration
     chain_id = int(os.getenv("CHAIN_ID", "11155111"))
 
-    # Validate required environment variables
-    required_vars = {
-        "RPC_URL": rpc_url,
-        "IDENTITY_CONTRACT_ADDRESS": identity_contract,
-        "REPUTATION_CONTRACT_ADDRESS": reputation_contract,
-        "BOB_PRIVATE_KEY": bob_private_key,
-        "BOB_ADDRESS": bob_address,
-        "ALICE_PRIVATE_KEY": alice_private_key,
-        "ALICE_ADDRESS": alice_address,
+    # IPFS configuration (defaults to local daemon)
+    ipfs_config = {
+        "ipfs_url": os.getenv("IPFS_API_URL", "http://127.0.0.1:5001"),
+        "ipfs_gateway": os.getenv("IPFS_GATEWAY_URL"),
+        "api_key": os.getenv("IPFS_API_KEY"),
+        "api_secret": os.getenv("IPFS_API_SECRET"),
     }
-    missing = [key for key, value in required_vars.items() if not value]
-    if missing:
-        raise ValueError(
-            f"Missing required environment variables: {', '.join(missing)}. "
-            f"Please create a .env file based on .env.example"
-        )
+    ipfs_storage = IPFSStorage(**{k: v for k, v in ipfs_config.items() if v})
 
     # ============================================================================
     # Step 1: Bob registers an empty agent
@@ -82,16 +81,17 @@ def main() -> None:
         if not agent_id:
             raise ValueError("Failed to get agent ID from registration")
 
-    # ============================================================================
-    # Step 2: Bob sets the token URI for his agent
-    # ============================================================================
-    print("\nStep 2: Bob sets the token URI...")
-    token_uri = "ipfs://QmBobAgentProfile"
-    set_uri_tx = bob_client.set_agent_uri(
+    # Store agent profile
+    agent_profile = _build_agent_profile(
         agent_id=agent_id,
-        new_uri=token_uri,
+        identity_contract=identity_contract,
+        bob_address=bob_address,
+        name="Bob's Agent",
+        description="Bob's agent is a helpful assistant that can answer questions and help with tasks. It is powered by the Reputation Registry contract.",
+        image="https://example.com/bob.png",
+        a2a_endpoint="https://example.com/bob.json",
+        supported_trust=["reputation", "crypto-economic", "tee-attestation"],
     )
-    print(f"  ✓ Set URI tx: {set_uri_tx}")
 
     # ============================================================================
     # Step 3: Bob approves his agent to Alice
@@ -147,3 +147,56 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+def _require_env(key: str) -> str:
+    """Fetch an environment variable and fail loudly if missing."""
+
+    value = os.getenv(key)
+    if not value:
+        raise ValueError(
+            f"Environment variable '{key}' is required. "
+            "Please update your .env file (see .env.example)."
+        )
+    return value
+
+
+def _build_agent_profile(
+    *,
+    agent_id: int,
+    identity_contract: str,
+    bob_address: str,
+    name: str,
+    description: str,
+    image: str,
+    a2a_endpoint: str,
+    supported_trust: List[str],
+) -> AgentProfile:
+    """Build the agent profile document using the ERC-8004 reference schema."""
+
+    if agent_id is None:
+        raise ValueError("agent_id is required to build the agent profile.")
+
+    registry_ref = f"eip155:1:{identity_contract}"
+    return AgentProfile(
+        name=name,
+        description=(
+            description
+        ),
+        image=image,
+        endpoints=[
+            AgentEndpoint(
+                name="A2A",
+                endpoint=a2a_endpoint,
+                version="0.3.0",
+            ),
+            AgentEndpoint(
+                name="agentWallet",
+                endpoint=f"eip155:1:{bob_address}",
+            ),
+        ],
+        registrations=[
+            AgentRegistrationEntry(agent_id=agent_id, agent_registry=registry_ref),
+        ],
+        supported_trust=supported_trust,
+    )

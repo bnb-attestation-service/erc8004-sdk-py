@@ -12,3 +12,7 @@ class ContractInteractionError(SDKError):
 class SignatureError(SDKError):
     """Raised when signing operations fail."""
 
+
+class IPFSStorageError(SDKError):
+    """Raised when IPFS storage operations fail."""
+

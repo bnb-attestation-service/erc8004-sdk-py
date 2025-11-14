@@ -119,5 +119,11 @@ ALICE_ADDRESS=0xYourAliceAddress
 
 # Chain Configuration
 CHAIN_ID=11155111
+
+# IPFS Configuration (optional; defaults to local daemon)
+IPFS_API_URL=http://127.0.0.1:5001
+IPFS_GATEWAY_URL=
+IPFS_API_KEY=
+IPFS_API_SECRET=
 ```
 

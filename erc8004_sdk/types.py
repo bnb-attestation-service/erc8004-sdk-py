@@ -1,6 +1,6 @@
 """Type definitions and data models."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 
@@ -113,3 +113,91 @@ class ReputationRevokeFeedbackArgs:
     gas_limit: int = 0
     value: int = 0
 
+
+@dataclass
+class AgentEndpoint:
+    """Endpoint information for an agent profile."""
+
+    name: str
+    endpoint: str
+    version: Optional[str] = None
+    capabilities: Optional[Mapping[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to JSON-serialisable dict."""
+
+        data: Dict[str, Any] = {
+            "name": self.name,
+            "endpoint": self.endpoint,
+        }
+        if self.version:
+            data["version"] = self.version
+        if self.capabilities:
+            data["capabilities"] = dict(self.capabilities)
+        return data
+
+
+@dataclass
+class AgentRegistrationEntry:
+    """Registration entry for an agent profile."""
+
+    agent_id: int
+    agent_registry: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to JSON-serialisable dict."""
+
+        return {
+            "agentId": self.agent_id,
+            "agentRegistry": self.agent_registry,
+        }
+
+
+@dataclass
+class AgentProfile:
+    """Structured data describing an agent for publication on IPFS."""
+
+    name: str
+    description: str
+    image: Optional[str]
+    endpoints: Sequence[Union[AgentEndpoint, Mapping[str, Any]]] = field(default_factory=list)
+    registrations: Sequence[Union[AgentRegistrationEntry, Mapping[str, Any]]] = field(default_factory=list)
+    supported_trust: Sequence[str] = field(default_factory=list)
+    profile_type: str = "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
+    additional_metadata: Optional[Mapping[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert the profile to the JSON schema expected by ERC-8004."""
+
+        data: Dict[str, Any] = {
+            "type": self.profile_type,
+            "name": self.name,
+            "description": self.description,
+            "supportedTrust": list(self.supported_trust),
+        }
+        if self.image:
+            data["image"] = self.image
+
+        data["endpoints"] = [self._coerce_endpoint(entry) for entry in self.endpoints]
+        data["registrations"] = [
+            self._coerce_registration(entry) for entry in self.registrations
+        ]
+
+        if self.additional_metadata:
+            data.update(dict(self.additional_metadata))
+
+        return data
+
+    @staticmethod
+    def _coerce_endpoint(entry: Union[AgentEndpoint, Mapping[str, Any]]) -> Dict[str, Any]:
+        if isinstance(entry, AgentEndpoint):
+            return entry.to_dict()
+        return dict(entry)
+
+    @staticmethod
+    def _coerce_registration(
+        entry: Union[AgentRegistrationEntry, Mapping[str, Any]]
+    ) -> Dict[str, Any]:
+        if isinstance(entry, AgentRegistrationEntry):
+            return entry.to_dict()
+        return dict(entry)
