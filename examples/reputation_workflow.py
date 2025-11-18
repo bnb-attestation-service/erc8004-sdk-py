@@ -110,13 +110,16 @@ def main() -> None:
 
     # Alice creates a feedback auth builder
     alice_auth_builder = AuthFeedbck(private_key=alice_private_key)
+    
+    last_index = bob_client.get_last_index(agent_id, alice_address)
+    print(f"  ✓ Last index: {last_index}")
 
     # Build the feedback authorization
     expiry = int(time.time()) + 3600  # 1 hour from now
     feedback_auth = alice_auth_builder.build(
         agent_id=agent_id,
         client_address=alice_address,
-        index_limit=1,
+        index_limit=last_index + 1,
         expiry=expiry,
         chain_id=chain_id,
         identity_registry=identity_contract,

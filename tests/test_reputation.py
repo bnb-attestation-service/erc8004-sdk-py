@@ -1,9 +1,17 @@
+import os
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import certifi
 import pytest
 from eth_utils import to_checksum_address
 from hexbytes import HexBytes
+
+# Ensure requests/web3 can load certificates in the sandbox environment
+CERT_PATH = certifi.where()
+os.environ.setdefault("SSL_CERT_FILE", CERT_PATH)
+os.environ.setdefault("REQUESTS_CA_BUNDLE", CERT_PATH)
+
 from web3 import Web3
 
 from erc8004_sdk.exceptions import ContractInteractionError
@@ -115,4 +123,26 @@ def test_coerce_bytes32(value, expected):
 def test_coerce_bytes32_rejects_long_values():
     with pytest.raises(ContractInteractionError):
         ReputationRegistryService._coerce_bytes32(b"a" * 33)
+
+
+def test_get_last_index_returns_value():
+    service = _make_service()
+    fn_mock = MagicMock()
+    fn_mock.call.return_value = 7
+    service._contract.functions.getLastIndex.return_value = fn_mock
+
+    result = service.get_last_index(1, "0x" + "3" * 40)
+
+    assert result == 7
+    service._contract.functions.getLastIndex.assert_called_once()
+
+
+def test_get_last_index_handles_logic_error():
+    service = _make_service()
+    fn_mock = MagicMock()
+    fn_mock.call.side_effect = ContractLogicError("failure")
+    service._contract.functions.getLastIndex.return_value = fn_mock
+
+    with pytest.raises(ContractInteractionError, match="Failed to query last index"):
+        service.get_last_index(1, "0x" + "3" * 40)
 

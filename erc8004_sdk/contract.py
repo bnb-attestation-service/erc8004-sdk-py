@@ -386,6 +386,18 @@ class ReputationRegistryService(BaseContractService):
             value=args.value,
         )
 
+    def get_last_index(self, agent_id: int, client_address: str) -> int:
+        """Call `getLastIndex` to query the latest feedback index for a client."""
+
+        try:
+            result = self.contract.functions.getLastIndex(
+                agent_id,
+                Web3.to_checksum_address(client_address),
+            ).call()
+            return int(result)
+        except ContractLogicError as err:
+            raise ContractInteractionError(f"Failed to query last index: {err}") from err
+
     @staticmethod
     def _coerce_bytes32(value) -> bytes:
         """Convert an input into bytes32."""
