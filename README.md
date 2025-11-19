@@ -127,3 +127,10 @@ IPFS_API_KEY=
 IPFS_API_SECRET=
 ```
 
+# Network
+
+## BSC Testnet
+- Identity Registry: `0xa98a5542a1aab336397d487e32021e0e48bef717`
+- Reputation Registry: `0x8602bf1bd40f1e840cadf402a2710c846c4c4ad5`
+- Validator Registry: `0x5b4015b372a83b517a38abe4d4c67687d77fca5a`
+- Comment Contract:  `0x07b0fd536e7b392393b5c6fcadbac4b4f1092d25`
