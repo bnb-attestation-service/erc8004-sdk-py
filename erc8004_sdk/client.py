@@ -265,5 +265,12 @@ class ERC8004Client:
         )
         return self._reputation_registry_service.revoke_feedback(args)
 
+    def get_last_index(self, agent_id: int, client_address: str) -> int:
+        """Return the most recent feedback index for a given client."""
+
+        return self._reputation_registry_service.get_last_index(
+            agent_id, client_address
+        )
+
 
 

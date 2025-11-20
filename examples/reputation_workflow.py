@@ -148,10 +148,6 @@ def main() -> None:
     print("\n✓ Complete workflow finished successfully!")
 
 
-if __name__ == "__main__":
-    main()
-
-
 def _require_env(key: str) -> str:
     """Fetch an environment variable and fail loudly if missing."""
 
@@ -203,3 +199,7 @@ def _build_agent_profile(
         ],
         supported_trust=supported_trust,
     )
+
+
+if __name__ == "__main__":
+    main()
