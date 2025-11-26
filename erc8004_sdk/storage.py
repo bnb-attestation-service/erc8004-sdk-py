@@ -211,4 +211,3 @@ class IPFSStorage:
             ) from err
         except (KeyError, ValueError) as err:
             raise IPFSStorageError(f"Invalid response from pinning service: {err}") from err
-

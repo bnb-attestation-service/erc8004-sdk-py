@@ -5,8 +5,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from erc8004_sdk.client import ERC8004Client
-from erc8004_sdk.exceptions import ContractInteractionError
+from erc8004_sdk.exceptions import (
+    ContractInteractionError,
+    IPFSStorageError,
+    SignatureError,
+)
+from erc8004_sdk.storage import IPFSStorage
+from erc8004_sdk.signer import AuthFeedback
 from erc8004_sdk.types import (
+    AgentProfile,
     IdentityRegistrationReceipt,
     IdentityRegistrationResult,
 )
@@ -170,3 +177,134 @@ def test_wait_for_receipt(mock_rep_cls, mock_id_cls):
     assert result["agentId"] == 42
     assert result["receipt"]["status"] == 1
     assert result["events"] == [{"event": "Registered"}]
+
+
+def _make_profile(agent_id: int = 1) -> AgentProfile:
+    return AgentProfile(
+        name="Agent",
+        description="Desc",
+        image=None,
+        endpoints=[],
+        registrations=[{"agentId": agent_id, "agentRegistry": "eip155:1:0x1"}],
+        supported_trust=["reputation"],
+    )
+
+
+@patch("erc8004_sdk.client.IdentityRegistryService")
+@patch("erc8004_sdk.client.ReputationRegistryService")
+def test_store_agent_profile_requires_storage(mock_rep_cls, mock_id_cls):
+    mock_id_cls.return_value = MagicMock()
+    mock_rep_cls.return_value = MagicMock()
+
+    client = ERC8004Client(
+        rpc_url="http://localhost:8545",
+        identity_contract_address="0x" + "1" * 40,
+        reputation_contract_address="0x" + "2" * 40,
+    )
+
+    with pytest.raises(IPFSStorageError):
+        client.store_agent_profile(_make_profile())
+
+
+@patch("erc8004_sdk.client.IdentityRegistryService")
+@patch("erc8004_sdk.client.ReputationRegistryService")
+def test_store_agent_profile_uses_storage(mock_rep_cls, mock_id_cls):
+    mock_id_cls.return_value = MagicMock()
+    mock_rep_cls.return_value = MagicMock()
+    storage = MagicMock(spec=IPFSStorage)
+    storage.store_agent_profile.return_value = "ipfs://mock"
+
+    client = ERC8004Client(
+        rpc_url="http://localhost:8545",
+        identity_contract_address="0x" + "1" * 40,
+        reputation_contract_address="0x" + "2" * 40,
+        ipfs_storage=storage,
+    )
+
+    profile = _make_profile()
+    uri = client.store_agent_profile(profile, pin=False)
+    assert uri == "ipfs://mock"
+    storage.store_agent_profile.assert_called_once_with(profile, pin=False)
+
+
+@patch("erc8004_sdk.client.IdentityRegistryService")
+@patch("erc8004_sdk.client.ReputationRegistryService")
+def test_build_feedback_auth_requires_builder(mock_rep_cls, mock_id_cls):
+    mock_id_cls.return_value = MagicMock()
+    mock_rep_cls.return_value = MagicMock()
+
+    client = ERC8004Client(
+        rpc_url="http://localhost:8545",
+        identity_contract_address="0x" + "1" * 40,
+        reputation_contract_address="0x" + "2" * 40,
+    )
+
+    with pytest.raises(SignatureError):
+        client.build_feedback_auth(
+            agent_id=1,
+            client_address="0x" + "3" * 40,
+            index_limit=1,
+            expiry=1234,
+            chain_id=1,
+            identity_registry="0x" + "4" * 40,
+        )
+
+
+@patch("erc8004_sdk.client.IdentityRegistryService")
+@patch("erc8004_sdk.client.ReputationRegistryService")
+def test_build_feedback_auth_uses_builder(mock_rep_cls, mock_id_cls):
+    mock_id_cls.return_value = MagicMock()
+    mock_rep_cls.return_value = MagicMock()
+    builder = MagicMock(spec=AuthFeedback)
+    payload = MagicMock()
+    builder.build.return_value = payload
+
+    client = ERC8004Client(
+        rpc_url="http://localhost:8545",
+        identity_contract_address="0x" + "1" * 40,
+        reputation_contract_address="0x" + "2" * 40,
+        auth_builder=builder,
+    )
+
+    result = client.build_feedback_auth(
+        agent_id=1,
+        client_address="0x" + "3" * 40,
+        index_limit=1,
+        expiry=1234,
+        chain_id=1,
+        identity_registry="0x" + "4" * 40,
+    )
+    assert result is payload
+    builder.build.assert_called_once()
+
+
+@patch("erc8004_sdk.client.IdentityRegistryService")
+@patch("erc8004_sdk.client.ReputationRegistryService")
+def test_configure_auth_builder_from_key(mock_rep_cls, mock_id_cls):
+    mock_id_cls.return_value = MagicMock()
+    mock_rep_cls.return_value = MagicMock()
+
+    client = ERC8004Client(
+        rpc_url="http://localhost:8545",
+        identity_contract_address="0x" + "1" * 40,
+        reputation_contract_address="0x" + "2" * 40,
+    )
+
+    builder = client.configure_auth_builder(private_key="0x" + "1" * 64)
+    assert builder is client.auth_builder
+
+
+@patch("erc8004_sdk.client.IdentityRegistryService")
+@patch("erc8004_sdk.client.ReputationRegistryService")
+def test_configure_ipfs_storage_from_kwargs(mock_rep_cls, mock_id_cls):
+    mock_id_cls.return_value = MagicMock()
+    mock_rep_cls.return_value = MagicMock()
+
+    client = ERC8004Client(
+        rpc_url="http://localhost:8545",
+        identity_contract_address="0x" + "1" * 40,
+        reputation_contract_address="0x" + "2" * 40,
+    )
+
+    storage = client.configure_ipfs_storage(ipfs_url="http://127.0.0.1:5001")
+    assert storage is client.ipfs_storage

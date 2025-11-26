@@ -28,7 +28,7 @@ ABI_TYPES = (
 
 @dataclass(frozen=True)
 class FeedbackAuthPayload:
-    """Feedback authorization payload returned by AuthFeedbck."""
+    """Feedback authorization payload returned by AuthFeedback."""
 
     agent_id: int
     client_address: str
@@ -63,7 +63,7 @@ class FeedbackAuthPayload:
         return "0x" + binascii.hexlify(self.encoded).decode()
 
 
-class AuthFeedbck:
+class AuthFeedback:
     """Build the `feedbackAuth` bytes required by `_verifyFeedbackAuth`."""
 
     def __init__(self, *, private_key: str) -> None:

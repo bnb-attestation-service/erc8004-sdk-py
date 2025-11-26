@@ -18,8 +18,7 @@ from typing import Dict, List, Optional, Any
 
 from dotenv import load_dotenv
 
-from erc8004_sdk import AuthFeedbck, ERC8004Client
-from erc8004_sdk.storage import IPFSStorage
+from erc8004_sdk import ERC8004Client
 from erc8004_sdk.types import (
     AgentEndpoint,
     AgentProfile,
@@ -55,7 +54,7 @@ def main() -> None:
         "api_key": os.getenv("IPFS_API_KEY"),
         "api_secret": os.getenv("IPFS_API_SECRET"),
     }
-    ipfs_storage = IPFSStorage(**{k: v for k, v in ipfs_config.items() if v})
+    ipfs_kwargs = {k: v for k, v in ipfs_config.items() if v}
 
     # ============================================================================
     # Step 1: Bob registers an empty agent
@@ -67,6 +66,16 @@ def main() -> None:
         reputation_contract_address=reputation_contract,
         default_account=bob_address,
         private_key=bob_private_key,
+        ipfs_config=ipfs_kwargs,
+    )
+
+    # Alice's client, used for submitting feedback and signing feedback auth
+    alice_client = ERC8004Client(
+        rpc_url=rpc_url,
+        identity_contract_address=identity_contract,
+        reputation_contract_address=reputation_contract,
+        default_account=alice_address,
+        private_key=alice_private_key,
     )
 
     registration_result = bob_client.register_minimal()
@@ -94,45 +103,36 @@ def main() -> None:
     )
 
     # ============================================================================
-    # Step 3: Bob approves his agent to Alice
+    # Step 2: Bob stores his agent profile on IPFS and sets the token URI
     # ============================================================================
-    print("\nStep 3: Bob approves his agent to Alice...")
-    approve_tx = bob_client.approve(
-        to_address=alice_address,
-        token_id=agent_id,
-    )
-    print(f"  ✓ Approval tx: {approve_tx}")
+    print("\nStep 2: Bob stores his agent profile on IPFS...")
+    profile_uri = bob_client.store_agent_profile(agent_profile)
+    print(f"  ✓ Profile URI: {profile_uri}")
+
+    print("  ✓ Setting token URI on-chain...")
+    token_uri_tx = bob_client.set_agent_uri(agent_id=agent_id, new_uri=profile_uri)
+    print(f"  ✓ Token URI tx: {token_uri_tx}")
 
     # ============================================================================
-    # Step 4: Alice generates feedback auth and calls giveFeedback
+    # Step 3: Bob generates feedback auth and to Alice for feedback
     # ============================================================================
-    print("\nStep 4: Alice generates feedback auth and submits feedback...")
-
-    # Alice creates a feedback auth builder
-    alice_auth_builder = AuthFeedbck(private_key=alice_private_key)
-    
-    last_index = bob_client.get_last_index(agent_id, alice_address)
-    print(f"  ✓ Last index: {last_index}")
+    print("\nStep 3: Bob generates feedback auth and to Alice for feedback...")
 
     # Build the feedback authorization
     expiry = int(time.time()) + 3600  # 1 hour from now
-    feedback_auth = alice_auth_builder.build(
+    feedback_auth = bob_client.build_feedback_auth(
         agent_id=agent_id,
         client_address=alice_address,
-        index_limit=last_index + 1,
+        index_limit=bob_client.get_last_index(agent_id, alice_address) + 1,
         expiry=expiry,
         chain_id=chain_id,
         identity_registry=identity_contract,
     )
 
-    # Alice creates her own client (or uses the same one with her credentials)
-    alice_client = ERC8004Client(
-        rpc_url=rpc_url,
-        identity_contract_address=identity_contract,
-        reputation_contract_address=reputation_contract,
-        default_account=alice_address,
-        private_key=alice_private_key,
-    )
+    # ============================================================================
+    # Step 4: Alice submits feedback to Bob's agent
+    # ============================================================================
+    print("\nStep 4: Alice submits feedback to Bob's agent...")
 
     # Submit feedback
     feedback_tx = alice_client.give_feedback(
@@ -145,8 +145,33 @@ def main() -> None:
         feedback_auth=feedback_auth.encoded,
     )
     print(f"  ✓ Feedback tx: {feedback_tx}")
-    print("\n✓ Complete workflow finished successfully!")
+    
+    # ============================================================================
+    # Step 5: Bob appends the feedback to his agent
+    # ============================================================================
+    print("\nStep 5: Bob appends the feedback to his agent...")
+    
+    # Append feedback
+    response_tx = bob_client.append_response(
+        agent_id=agent_id,
+        client_address=bob_client,
+        feedback_index=feedback_auth.index_limit,
+        response_uri="ipfs://QmBobResponse",
+        response_hash="0x" + "ab" * 32,
+    )
+    print(f"  ✓ Response tx: {response_tx}")
 
+    # ============================================================================
+    # Step 6: Alice revokes the feedback
+    # ============================================================================
+    print("\nStep 6: Alice revokes the feedback...")
+
+    # Revoke feedback
+    revoke_tx = alice_client.revoke_feedback(
+        agent_id=agent_id,
+        feedback_index=feedback_auth.index_limit,
+    )
+    print(f"  ✓ Revoke tx: {revoke_tx}")
 
 def _require_env(key: str) -> str:
     """Fetch an environment variable and fail loudly if missing."""

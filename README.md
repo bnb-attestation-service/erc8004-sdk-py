@@ -18,47 +18,53 @@ pip install -e .[dev]
 ```python
 import time
 
-from erc8004_sdk import ERC8004Client, AuthFeedbck
+from erc8004_sdk import ERC8004Client
+from erc8004_sdk.types import AgentProfile
 
 client = ERC8004Client(
     rpc_url="https://mainnet.infura.io/v3/YOUR_KEY",
-    contract_address="0xYourContract",
-    contract_abi=[...],  # contract ABI
+    identity_contract_address="0xYourIdentityRegistry",
+    reputation_contract_address="0xYourReputationRegistry",
     default_account="0xYourAccount",
-    reputation_contract_address="0xReputation",
-    reputation_contract_abi=[...],
+    private_key="0xYourPrivateKey",
+    ipfs_config={"ipfs_url": "http://127.0.0.1:5001"},
+    auth_private_key="0xabc123...",
 )
 
 result = client.register_agent(
-    token_uri="ipfs://your_metadata",
+    token_uri="ipfs://placeholder",
     metadata=[
         {"key": "name", "value": "Sample Agent"},
         {"key": "data", "value": "0x1234"},
     ],
-    gas_limit=200_000,
 )
-print(result.tx_hash, result.agent_id)
+agent_id = result.agent_id or 0
 
-auth_builder = AuthFeedbck(private_key="0xabc123...")
-feedback_auth = auth_builder.build(
-    agent_id=result.agent_id or 0,
+profile_uri = client.store_agent_profile(
+    AgentProfile(
+        name="Sample Agent",
+        description="Always-on helper",
+        image=None,
+        endpoints=[{"name": "A2A", "endpoint": "https://example.com/agent.json"}],
+        registrations=[
+            {"agentId": agent_id, "agentRegistry": f"eip155:1:{client.contract_address}"},
+        ],
+        supported_trust=["reputation"],
+    )
+)
+client.set_agent_uri(agent_id=agent_id, new_uri=profile_uri)
+
+feedback_auth = client.build_feedback_auth(
+    agent_id=agent_id,
     client_address="0xClient",
     index_limit=10,
     expiry=int(time.time()) + 3600,
     chain_id=1,
     identity_registry=client.contract_address,
 ).hex()
-print(feedback_auth)
 
-# Authorization helpers
-client.approve(to_address="0xAnother", token_id=42)
-client.set_approval_for_all(operator="0xOperator", approved=True)
-approved = client.get_approved(42)
-is_all = client.is_approved_for_all("0xOwner", "0xOperator")
-
-# Reputation registry helpers
 client.give_feedback(
-    agent_id=result.agent_id or 0,
+    agent_id=agent_id,
     score=9,
     tag1="customer_support",
     tag2="satisfaction",

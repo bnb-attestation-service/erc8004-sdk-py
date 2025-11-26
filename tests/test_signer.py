@@ -8,7 +8,7 @@ from eth_utils import keccak
 from web3 import Web3
 
 from erc8004_sdk.exceptions import SignatureError
-from erc8004_sdk.signer import ABI_TYPES, AuthFeedbck, FeedbackAuthPayload
+from erc8004_sdk.signer import ABI_TYPES, AuthFeedback, FeedbackAuthPayload
 
 
 def _strip_hex_prefix(value: str) -> str:
@@ -17,7 +17,7 @@ def _strip_hex_prefix(value: str) -> str:
 
 def test_build_feedback_auth_payload_roundtrip():
     acct = Account.create()
-    builder = AuthFeedbck(private_key=acct.key.hex())
+    builder = AuthFeedback(private_key=acct.key.hex())
 
     payload = builder.build(
         agent_id=123,
@@ -64,7 +64,7 @@ def test_build_feedback_auth_payload_roundtrip():
 
 def test_build_feedback_auth_payload_with_custom_signer():
     acct = Account.create()
-    builder = AuthFeedbck(private_key=acct.key.hex())
+    builder = (private_key=acct.key.hex())
 
     payload = builder.build(
         agent_id=1,
@@ -83,5 +83,5 @@ def test_build_feedback_auth_payload_with_custom_signer():
 
 def test_authfeedback_requires_private_key():
     with pytest.raises(SignatureError):
-        AuthFeedbck(private_key="")
+        AuthFeedback(private_key="")
 

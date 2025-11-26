@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional, Union
+from pathlib import Path
+from typing import Any, Dict, Mapping, Optional, Sequence, Union
 
 from .abi import IDENTITY_REGISTRY_ABI, REPUTATION_REGISTRY_ABI
 from .contract import IdentityRegistryService, ReputationRegistryService
-from .exceptions import ContractInteractionError
+from .exceptions import ContractInteractionError, IPFSStorageError, SignatureError
+from .signer import AuthFeedback, FeedbackAuthPayload
+from .storage import IPFSStorage
 from .types import (
+    AgentProfile,
     ContractConfig,
     ReputationFeedbackArgs,
     MetadataEntry,
@@ -30,6 +34,10 @@ class ERC8004Client:
         default_account: Optional[str] = None,
         private_key: Optional[str] = None,
         enable_poa: bool = False,
+        ipfs_storage: Optional[IPFSStorage] = None,
+        ipfs_config: Optional[Mapping[str, Any]] = None,
+        auth_builder: Optional[AuthFeedback] = None,
+        auth_private_key: Optional[str] = None,
     ) -> None:
         if not identity_contract_address:
             raise ContractInteractionError(
@@ -58,10 +66,145 @@ class ERC8004Client:
         )
         self._reputation_registry_service = ReputationRegistryService(reputation_registry_config, enable_poa=enable_poa)
 
+        self._ipfs_storage = ipfs_storage or (
+            IPFSStorage(**dict(ipfs_config)) if ipfs_config else None
+        )
+
+        # Prefer an explicitly supplied AuthFeedback instance, then an explicit
+        # auth_private_key, and finally fall back to the client's private_key
+        # so that basic usage only requires one key argument.
+        effective_auth_key = auth_private_key or private_key
+        self._auth_builder = auth_builder or (
+            AuthFeedback(private_key=effective_auth_key)
+            if effective_auth_key
+            else None
+        )
+
     @property
     def contract_address(self) -> str:
         """Return current contract address."""
         return self._identity_registry_service.contract.address
+
+    @property
+    def ipfs_storage(self) -> Optional[IPFSStorage]:
+        """Return the configured IPFS storage helper, if any."""
+
+        return self._ipfs_storage
+
+    @property
+    def auth_builder(self) -> Optional[AuthFeedback]:
+        """Return the configured feedback authorization builder, if any."""
+
+        return self._auth_builder
+
+    # Helper configuration -----------------------------------------------------
+
+    def configure_ipfs_storage(
+        self,
+        *,
+        storage: Optional[IPFSStorage] = None,
+        config: Optional[Mapping[str, Any]] = None,
+        **storage_kwargs: Any,
+    ) -> IPFSStorage:
+        """
+        Configure or replace the IPFS storage helper.
+
+        Provide either an existing IPFSStorage instance, a config mapping, or
+        direct keyword arguments accepted by IPFSStorage.
+        """
+
+        if storage is not None:
+            self._ipfs_storage = storage
+        elif config is not None:
+            self._ipfs_storage = IPFSStorage(**dict(config))
+        elif storage_kwargs:
+            self._ipfs_storage = IPFSStorage(**storage_kwargs)
+        elif self._ipfs_storage is None:
+            raise IPFSStorageError(
+                "IPFS storage is not configured. Provide a storage instance or"
+                " configuration values."
+            )
+        return self._ipfs_storage
+
+    def configure_auth_builder(
+        self,
+        *,
+        builder: Optional[AuthFeedback] = None,
+        private_key: Optional[str] = None,
+    ) -> AuthFeedback:
+        """
+        Configure the feedback authorization builder.
+
+        Provide either an AuthFeedback instance or the private key used for
+        producing signatures.
+        """
+
+        if builder is not None:
+            self._auth_builder = builder
+        elif private_key:
+            self._auth_builder = AuthFeedback(private_key=private_key)
+        elif self._auth_builder is None:
+            raise SignatureError(
+                "Auth builder is not configured. Provide a builder or a"
+                " private key."
+            )
+        return self._auth_builder
+
+    # Storage helpers ----------------------------------------------------------
+
+    def store_agent_profile(
+        self,
+        profile: AgentProfile,
+        *,
+        pin: bool = True,
+    ) -> str:
+        """Store an AgentProfile document via the configured IPFS storage."""
+
+        storage = self._ensure_ipfs_storage()
+        return storage.store_agent_profile(profile, pin=pin)
+
+    def store_json(self, data: Dict[str, Any], *, pin: bool = True) -> str:
+        """Store an arbitrary JSON document via the configured IPFS storage."""
+
+        storage = self._ensure_ipfs_storage()
+        return storage.store_json(data, pin=pin)
+
+    def store_file(
+        self,
+        file_path: Union[str, Path],
+        *,
+        pin: bool = True,
+    ) -> str:
+        """Store a local file via the configured IPFS storage."""
+
+        storage = self._ensure_ipfs_storage()
+        return storage.store_file(file_path, pin=pin)
+
+    # Feedback helpers ---------------------------------------------------------
+
+    def build_feedback_auth(
+        self,
+        *,
+        agent_id: int,
+        client_address: str,
+        index_limit: int,
+        expiry: int,
+        chain_id: int,
+        identity_registry: str,
+        signer_address: Optional[str] = None,
+    ) -> FeedbackAuthPayload:
+        """Construct a feedback authorization payload using the configured builder."""
+
+        builder = self._ensure_auth_builder()
+        return builder.build(
+            agent_id=agent_id,
+            client_address=client_address,
+            index_limit=index_limit,
+            expiry=expiry,
+            chain_id=chain_id,
+            identity_registry=identity_registry,
+            signer_address=signer_address,
+        )
 
     def register_minimal(
         self,
@@ -272,5 +415,25 @@ class ERC8004Client:
             agent_id, client_address
         )
 
+    # Internal helpers ---------------------------------------------------------
+
+    def _ensure_ipfs_storage(self) -> IPFSStorage:
+        if self._ipfs_storage is None:
+            raise IPFSStorageError(
+                "IPFS storage is not configured. Pass `ipfs_storage`, provide"
+                " `ipfs_config`, or call `configure_ipfs_storage()` before"
+                " using storage helpers."
+            )
+        return self._ipfs_storage
+
+    def _ensure_auth_builder(self) -> AuthFeedback:
+        if self._auth_builder is None:
+            raise SignatureError(
+                "Auth builder is not configured. Pass `auth_builder`, provide"
+                " `auth_private_key`, or call `configure_auth_builder()` before"
+                " building feedback authorization payloads."
+            )
+        return self._auth_builder
 
 
+# todo: add sign feedback auth
